@@ -1,0 +1,34 @@
+module.exports = {
+  ROLES: {
+    ADMIN: 'ADMIN',
+    DOCTOR: 'DOCTOR',
+    STUDENT: 'STUDENT'
+  },
+  ACCOUNT_STATUS: {
+    ACTIVE: 'ACTIVE',
+    SUSPENDED: 'SUSPENDED',
+    EXPIRED: 'EXPIRED',
+    SOFT_DELETED: 'SOFT_DELETED',
+    PENDING: 'PENDING'
+  },
+  ATTENDANCE_STATUS: {
+    PRESENT: 'PRESENT',
+    ABSENT: 'ABSENT',
+    LATE: 'LATE',
+    EXCUSED: 'EXCUSED'
+  },
+  ASSIGNMENT_STATUS: {
+    NEW: 'NEW',
+    SUBMITTED: 'SUBMITTED',
+    LATE: 'LATE',
+    GRADED: 'GRADED'
+  },
+  EXAM_TYPES: {
+    QUIZ: 'QUIZ',
+    MIDTERM: 'MIDTERM',
+    FINAL: 'FINAL',
+    PRACTICAL: 'PRACTICAL',
+    ORAL: 'ORAL',
+    OTHER: 'OTHER'
+  }
+};
