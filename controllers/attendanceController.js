@@ -30,7 +30,16 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 // 1. Session Creation (Doctor / Admin)
 // ─────────────────────────────────────────────
 const createSession = async (req, res) => {
-  const { sectionId, sessionTitle, durationMinutes = 180, geoFence } = req.body;
+  let { sectionId, sessionTitle, durationMinutes = 180, geoFence, latitude, longitude, radiusMeters } = req.body;
+
+  // Resolve geofence if supplied either as nested object or top-level properties
+  if (!geoFence && (latitude !== undefined && longitude !== undefined)) {
+    geoFence = {
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+      radiusMeters: radiusMeters ? Number(radiusMeters) : 50
+    };
+  }
 
   const section = await Section.findById(sectionId);
   if (!section) {
@@ -204,8 +213,18 @@ const getActiveSessionForSection = async (req, res) => {
 // 3. Student Check-in (Anti-Proxy & Geofence)
 // ─────────────────────────────────────────────
 const studentCheckIn = async (req, res) => {
-  const { token, deviceId, isBiometricVerified = false, coordinates } = req.body;
+  let { token, deviceId, isBiometricVerified = false, coordinates, latitude, longitude } = req.body;
   const clientIp = req.ip || req.connection?.remoteAddress || '';
+
+  // Resolve coordinates if supplied as top-level fields
+  if (!coordinates && (latitude !== undefined && longitude !== undefined)) {
+    coordinates = { lat: Number(latitude), lng: Number(longitude) };
+  }
+
+  // Ensure a valid deviceId exists for anti-proxy checking
+  if (!deviceId || typeof deviceId !== 'string' || !deviceId.trim()) {
+    deviceId = `dev-${req.user._id.toString().slice(-6)}-${clientIp || 'client'}`;
+  }
 
   const decoded = verifyDynamicSessionToken(token);
   if (!decoded) {
@@ -356,14 +375,26 @@ const getLiveSession = async (req, res) => {
       .lean()
   ]);
 
-  const presentStudentIds = new Set(records.map((r) => r.student?._id.toString()));
+  const presentStudentIds = new Set(records.map((r) => r.student?._id ? r.student._id.toString() : ''));
 
-  const absentStudents = (section.students || []).filter(
+  const absentStudents = (section?.students || []).filter(
     (student) => !presentStudentIds.has(student._id.toString())
   );
 
-  res.status(200).json({
-    success: true,
+  let qrImage = null;
+  if (session.status === 'OPEN' && session.dynamicToken) {
+    const qrPayload = JSON.stringify({
+      sessionId: session._id,
+      token: session.dynamicToken
+    });
+    try {
+      qrImage = await generateQRCodeDataURL(qrPayload);
+    } catch (e) {
+      // Fallback silently if QR generation fails
+    }
+  }
+
+  const payload = {
     session: {
       _id: session._id,
       sessionTitle: session.sessionTitle,
@@ -371,12 +402,61 @@ const getLiveSession = async (req, res) => {
       startTime: session.startTime,
       expiresAt: session.expiresAt,
       checkInCount: records.length,
-      totalEnrolled: (section.students || []).length
+      totalEnrolled: (section?.students || []).length
     },
     attendeesCount: records.length,
     absenteesCount: absentStudents.length,
     attendees: records,
-    absentees: absentStudents
+    absentees: absentStudents,
+    qrImage,
+    token: session.dynamicToken
+  };
+
+  res.status(200).json({
+    success: true,
+    data: payload,
+    ...payload
+  });
+};
+
+// ─────────────────────────────────────────────
+// 4.5 Rotate Dynamic Token & QR Code (Doctor / Admin)
+// ─────────────────────────────────────────────
+const rotateSessionToken = async (req, res) => {
+  const session = await AttendanceSession.findById(req.params.id);
+  if (!session) {
+    return res.status(404).json({ success: false, message: 'Session not found' });
+  }
+
+  if (session.status !== 'OPEN') {
+    return res.status(400).json({ success: false, message: 'Session is already closed' });
+  }
+
+  // Doctor ownership verification
+  if (session.doctor.toString() !== req.user._id.toString() && req.user.role !== ROLES.ADMIN) {
+    return res.status(403).json({ success: false, message: 'Not authorized for this session' });
+  }
+
+  // Calculate remaining minutes
+  const remainingMinutes = Math.max(5, Math.ceil((new Date(session.expiresAt) - new Date()) / (60 * 1000)));
+  const newJwt = generateDynamicSessionToken(session._id, session.section, remainingMinutes);
+  session.dynamicToken = newJwt;
+  await session.save();
+
+  const qrPayload = JSON.stringify({
+    sessionId: session._id,
+    token: newJwt
+  });
+  const qrImage = await generateQRCodeDataURL(qrPayload);
+
+  res.status(200).json({
+    success: true,
+    message: 'QR Code rotated successfully',
+    data: {
+      _id: session._id,
+      token: newJwt,
+      qrImage
+    }
   });
 };
 
@@ -643,6 +723,7 @@ module.exports = {
   getActiveSessionForSection,
   studentCheckIn,
   getLiveSession,
+  rotateSessionToken,
   manualUpdateRecord,
   getStudentAttendanceStats,
   getSectionAttendanceOverview,

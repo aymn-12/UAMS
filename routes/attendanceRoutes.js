@@ -7,6 +7,7 @@ const {
   getActiveSessionForSection,
   studentCheckIn,
   getLiveSession,
+  rotateSessionToken,
   manualUpdateRecord,
   getStudentAttendanceStats,
   getSectionAttendanceOverview,
@@ -45,6 +46,12 @@ router.get(
   '/sessions/:id/live',
   authorize(ROLES.DOCTOR, ROLES.ADMIN),
   getLiveSession
+);
+
+router.post(
+  '/sessions/:id/rotate-token',
+  authorize(ROLES.DOCTOR, ROLES.ADMIN),
+  rotateSessionToken
 );
 
 router.get(

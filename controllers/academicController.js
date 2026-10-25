@@ -452,6 +452,59 @@ const addScheduleSlot = async (req, res) => {
   res.status(201).json({ success: true, message: 'Schedule slot added successfully', data: slot });
 };
 
+const updateScheduleSlot = async (req, res) => {
+  const { id } = req.params;
+  const { dayOfWeek, startTime, endTime, room, building } = req.body;
+
+  const slot = await ScheduleSlot.findById(id);
+  if (!slot) {
+    return res.status(404).json({ success: false, message: 'Schedule slot not found' });
+  }
+
+  if (dayOfWeek) slot.dayOfWeek = dayOfWeek.toUpperCase();
+  if (startTime) slot.startTime = startTime;
+  if (endTime !== undefined) slot.endTime = endTime;
+  if (room !== undefined) slot.room = room.trim();
+  if (building !== undefined) slot.building = building.trim();
+
+  await slot.save();
+
+  logAction({
+    user: req.user,
+    action: 'UPDATE_SCHEDULE_SLOT',
+    category: 'ACADEMIC',
+    targetEntity: 'ScheduleSlot',
+    targetId: slot._id,
+    details: { dayOfWeek, startTime, endTime, room, building },
+    req
+  });
+
+  res.status(200).json({ success: true, message: 'Schedule slot updated successfully', data: slot });
+};
+
+const deleteScheduleSlot = async (req, res) => {
+  const { id } = req.params;
+
+  const slot = await ScheduleSlot.findById(id);
+  if (!slot) {
+    return res.status(404).json({ success: false, message: 'Schedule slot not found' });
+  }
+
+  await ScheduleSlot.findByIdAndDelete(id);
+
+  logAction({
+    user: req.user,
+    action: 'DELETE_SCHEDULE_SLOT',
+    category: 'ACADEMIC',
+    targetEntity: 'ScheduleSlot',
+    targetId: id,
+    details: { sectionId: slot.section, dayOfWeek: slot.dayOfWeek, startTime: slot.startTime },
+    req
+  });
+
+  res.status(200).json({ success: true, message: 'Schedule slot deleted successfully' });
+};
+
 const getScheduleByDay = async (req, res) => {
   const { day } = req.query;
   const userId = req.user._id;
@@ -516,6 +569,8 @@ module.exports = {
   enrollStudents,
   unenrollStudent,
   addScheduleSlot,
+  updateScheduleSlot,
+  deleteScheduleSlot,
   getScheduleByDay,
   getSectionSchedule
 };

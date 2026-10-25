@@ -6,27 +6,32 @@ const objectIdPattern = /^[0-9a-fA-F]{24}$/;
 const createSessionSchema = Joi.object({
   sectionId: Joi.string().pattern(objectIdPattern).required(),
   sessionTitle: Joi.string().trim().max(100).optional(),
+  sessionType: Joi.string().optional(),
   // Flexible duration: from 5 minutes up to 24 hours (1440 mins). Default is 180 mins.
   durationMinutes: Joi.number().integer().min(5).max(1440).default(180),
   geoFence: Joi.object({
     latitude: Joi.number().min(-90).max(90).required(),
     longitude: Joi.number().min(-180).max(180).required(),
     radiusMeters: Joi.number().positive().max(2000).default(100)
-  }).optional()
+  }).optional(),
+  latitude: Joi.number().min(-90).max(90).optional(),
+  longitude: Joi.number().min(-180).max(180).optional(),
+  radiusMeters: Joi.number().positive().max(2000).optional()
 });
 
 const checkInSchema = Joi.object({
   token: Joi.string().required().messages({
     'any.required': 'QR attendance token is required'
   }),
-  deviceId: Joi.string().trim().min(3).max(150).required().messages({
-    'any.required': 'Device identification is required to verify physical attendance'
-  }),
+  deviceId: Joi.string().trim().min(3).max(150).optional().default('web-client'),
   isBiometricVerified: Joi.boolean().default(false),
   coordinates: Joi.object({
     lat: Joi.number().min(-90).max(90).required(),
     lng: Joi.number().min(-180).max(180).required()
-  }).optional()
+  }).optional(),
+  latitude: Joi.number().min(-90).max(90).optional(),
+  longitude: Joi.number().min(-180).max(180).optional(),
+  sessionId: Joi.string().optional()
 });
 
 const manualUpdateRecordSchema = Joi.object({

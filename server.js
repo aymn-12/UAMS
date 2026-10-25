@@ -1,4 +1,5 @@
 require('dotenv').config();
+const path = require('path');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -57,8 +58,8 @@ app.use(cors({
 }));
 
 // 4. Body parsers & Cookie Parser
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use(cookieParser());
 
 // 5. CSRF Protection Middleware
@@ -85,6 +86,13 @@ if (process.env.NODE_ENV === 'development') {
   app.use(devHttpLogger);
 }
 
+// 10. Serve uploaded files (with safe directory options)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  dotfiles: 'ignore',
+  index: false,
+  maxAge: '1d'
+}));
+
 // ─────────────────────────────────────────────
 // Route Handlers
 // ─────────────────────────────────────────────
@@ -103,6 +111,7 @@ app.use('/api/questions',     require('./routes/questionRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/announcements', require('./routes/announcementRoutes'));
 app.use('/api/dashboards',    require('./routes/dashboardRoutes'));
+app.use('/api/dashboard',     require('./routes/dashboardRoutes'));
 app.use('/api/reports',       require('./routes/reportRoutes'));
 
 // ─────────────────────────────────────────────

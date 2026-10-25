@@ -133,7 +133,59 @@ const accessMaterialFile = async (req, res) => {
   return res.sendFile(resolvedPath);
 };
 
+// ─────────────────────────────────────────────
+// 3. Secure Assignment Submission File Download
+// ─────────────────────────────────────────────
+const accessSubmissionFile = async (req, res) => {
+  const { submissionId, fileIndex } = req.params;
+  const Submission = require('../models/Submission');
+  const Assignment = require('../models/Assignment');
+
+  const submission = await Submission.findById(submissionId).populate('assignment');
+  if (!submission) {
+    return res.status(404).json({ success: false, message: 'Submission not found' });
+  }
+
+  const assignment = submission.assignment;
+  if (!assignment) {
+    return res.status(404).json({ success: false, message: 'Associated assignment not found' });
+  }
+
+  const section = await Section.findById(assignment.section).select('doctor students').lean();
+  if (!section) {
+    return res.status(404).json({ success: false, message: 'Associated section not found' });
+  }
+
+  const isStudent = submission.student.toString() === req.user._id.toString();
+  const isDoctor = section.doctor.toString() === req.user._id.toString();
+  const isAdmin = req.user.role === ROLES.ADMIN;
+
+  if (!isAdmin && !isDoctor && !isStudent) {
+    return res.status(403).json({ success: false, message: 'Access denied: You cannot view this submission' });
+  }
+
+  const idx = parseInt(fileIndex, 10) || 0;
+  const fileObj = (submission.submittedFiles || [])[idx];
+  if (!fileObj || !fileObj.fileUrl) {
+    return res.status(404).json({ success: false, message: 'Submitted file not found' });
+  }
+
+  const relativeFile = fileObj.fileUrl.replace(/^\/uploads\//, '');
+  const resolvedPath = path.resolve(UPLOAD_ROOT, relativeFile);
+
+  if (!resolvedPath.startsWith(UPLOAD_ROOT)) {
+    return res.status(403).json({ success: false, message: 'Security violation: Invalid file path' });
+  }
+
+  if (!fs.existsSync(resolvedPath)) {
+    return res.status(404).json({ success: false, message: 'Physical file not found on disk' });
+  }
+
+  return res.download(resolvedPath, fileObj.fileName || 'submission.pdf');
+};
+
 module.exports = {
   uploadMaterial,
-  accessMaterialFile
+  accessMaterialFile,
+  accessSubmissionFile
 };

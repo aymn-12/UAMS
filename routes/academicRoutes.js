@@ -11,6 +11,8 @@ const {
   enrollStudents,
   unenrollStudent,
   addScheduleSlot,
+  updateScheduleSlot,
+  deleteScheduleSlot,
   getScheduleByDay,
   getSectionSchedule
 } = require('../controllers/academicController');
@@ -81,7 +83,18 @@ router.route('/sections/:id/schedule')
 router.route('/schedules/slots')
   .post(authorize(ROLES.ADMIN), validate(addScheduleSlotSchema), addScheduleSlot);
 
+router.route('/schedules/slots/:id')
+  .put(authorize(ROLES.ADMIN), updateScheduleSlot)
+  .delete(authorize(ROLES.ADMIN), deleteScheduleSlot);
+
+router.route('/sections/:sectionId/schedule/:id')
+  .put(authorize(ROLES.ADMIN), updateScheduleSlot)
+  .delete(authorize(ROLES.ADMIN), deleteScheduleSlot);
+
 router.route('/schedules')
+  .get(getScheduleByDay);
+
+router.route('/schedule')
   .get(getScheduleByDay);
 
 module.exports = router;
